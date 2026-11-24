@@ -28,6 +28,8 @@ const formatDuration = (seconds = 0) => {
 
 export default function App() {
   const inputRef = useRef(null);
+  const videoUrlRef = useRef("");
+  const outputUrlRef = useRef("");
   const [file, setFile] = useState(null);
   const [videoInfo, setVideoInfo] = useState(null);
   const [profile, setProfile] = useState("high");
@@ -42,9 +44,9 @@ export default function App() {
   const [error, setError] = useState("");
 
   useEffect(() => () => {
-    if (outputUrl) URL.revokeObjectURL(outputUrl);
-    if (videoInfo?.url) URL.revokeObjectURL(videoInfo.url);
-  }, [outputUrl, videoInfo]);
+    if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+    if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
+  }, []);
 
   const selectedProfile = useMemo(
     () => profiles.find((item) => item.id === profile) ?? profiles[1],
@@ -59,13 +61,16 @@ export default function App() {
       setError("Format belum didukung. Gunakan MP4, MOV, MKV, atau WebM.");
       return;
     }
-    if (videoInfo?.url) URL.revokeObjectURL(videoInfo.url);
-    if (outputUrl) URL.revokeObjectURL(outputUrl);
+    if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+    if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
+    outputUrlRef.current = "";
+    const previewUrl = URL.createObjectURL(nextFile);
+    videoUrlRef.current = previewUrl;
     setOutputUrl("");
     setOutputSize(0);
     setError("");
     setFile(nextFile);
-    setVideoInfo({ url: URL.createObjectURL(nextFile), width: 0, height: 0, duration: 0 });
+    setVideoInfo({ url: previewUrl, width: 0, height: 0, duration: 0 });
   }
 
   function onVideoMetadata(event) {
@@ -95,10 +100,9 @@ export default function App() {
         () => {},
       );
       const url = URL.createObjectURL(blob);
-      setOutputUrl((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return url;
-      });
+      if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
+      outputUrlRef.current = url;
+      setOutputUrl(url);
       setOutputSize(blob.size);
       setProgress(100);
       setStatus("Transcoding selesai");
@@ -113,6 +117,10 @@ export default function App() {
 
   function clearFile() {
     if (busy) return;
+    if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+    if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
+    videoUrlRef.current = "";
+    outputUrlRef.current = "";
     setFile(null);
     setVideoInfo(null);
     setOutputUrl("");
