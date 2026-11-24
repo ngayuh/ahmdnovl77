@@ -156,6 +156,10 @@ export default function App() {
 
   function clearFile() {
     if (busy) return;
+    originalCompareRef.current?.pause();
+    enhancedCompareRef.current?.pause();
+    setComparePlaying(false);
+    setCompareTime(0);
     if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
     if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
     videoUrlRef.current = "";
@@ -305,7 +309,10 @@ export default function App() {
                 muted
                 playsInline
                 onTimeUpdate={syncComparisonTime}
-                onEnded={() => setComparePlaying(false)}
+                onEnded={() => {
+                  originalCompareRef.current?.pause();
+                  setComparePlaying(false);
+                }}
               />
               <video
                 ref={originalCompareRef}
