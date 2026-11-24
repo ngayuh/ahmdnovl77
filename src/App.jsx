@@ -28,6 +28,8 @@ const formatDuration = (seconds = 0) => {
 
 export default function App() {
   const inputRef = useRef(null);
+  const originalCompareRef = useRef(null);
+  const enhancedCompareRef = useRef(null);
   const videoUrlRef = useRef("");
   const outputUrlRef = useRef("");
   const [file, setFile] = useState(null);
@@ -41,6 +43,9 @@ export default function App() {
   const [outputUrl, setOutputUrl] = useState("");
   const [outputSize, setOutputSize] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [comparePosition, setComparePosition] = useState(50);
+  const [comparePlaying, setComparePlaying] = useState(false);
+  const [compareTime, setCompareTime] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => () => {
@@ -113,6 +118,40 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function toggleComparePlayback() {
+    const original = originalCompareRef.current;
+    const enhanced = enhancedCompareRef.current;
+    if (!original || !enhanced) return;
+
+    if (comparePlaying) {
+      original.pause();
+      enhanced.pause();
+      setComparePlaying(false);
+      return;
+    }
+
+    const startAt = Math.min(original.currentTime, enhanced.currentTime);
+    original.currentTime = startAt;
+    enhanced.currentTime = startAt;
+    Promise.all([original.play(), enhanced.play()])
+      .then(() => setComparePlaying(true))
+      .catch(() => setError("Browser tidak dapat memutar kedua preview sekaligus. Coba tekan Play lagi."));
+  }
+
+  function seekComparison(value) {
+    const time = Number(value);
+    setCompareTime(time);
+    if (originalCompareRef.current) originalCompareRef.current.currentTime = time;
+    if (enhancedCompareRef.current) enhancedCompareRef.current.currentTime = time;
+  }
+
+  function syncComparisonTime(event) {
+    const time = event.currentTarget.currentTime;
+    setCompareTime(time);
+    const other = originalCompareRef.current;
+    if (other && Math.abs(other.currentTime - time) > 0.18) other.currentTime = time;
   }
 
   function clearFile() {
@@ -250,6 +289,72 @@ export default function App() {
             <div className="privacy-note"><ShieldCheck size={14} /><span>Files stay on your device during processing.</span></div>
           </aside>
         </div>
+      </section>
+
+      <section className="double-vision-section" id="double-vision">
+        <div className="section-heading">
+          <div><span className="section-index">04 / QUALITY CHECK</span><h2>Double Vision</h2></div>
+          <span className="compare-badge"><Sparkles size={13} /> A/B COMPARISON</span>
+        </div>
+        {outputUrl && videoInfo?.url ? (
+          <div className="comparison-card">
+            <div className="comparison-stage">
+              <video
+                ref={enhancedCompareRef}
+                src={outputUrl}
+                muted
+                playsInline
+                onTimeUpdate={syncComparisonTime}
+                onEnded={() => setComparePlaying(false)}
+              />
+              <video
+                ref={originalCompareRef}
+                src={videoInfo.url}
+                muted
+                playsInline
+                style={{ clipPath: `inset(0 ${100 - comparePosition}% 0 0)` }}
+              />
+              <span className="compare-label original-label">ORIGINAL</span>
+              <span className="compare-label enhanced-label">ENHANCED</span>
+              <span className="compare-divider" style={{ left: `${comparePosition}%` }}><i /></span>
+            </div>
+            <div className="compare-controls">
+              <button className="compare-play" onClick={toggleComparePlayback} aria-label={comparePlaying ? "Pause comparison" : "Play comparison"}>
+                {comparePlaying ? "Pause" : "Play"} <span>{comparePlaying ? "Ⅱ" : "▶"}</span>
+              </button>
+              <span className="compare-time">{formatDuration(compareTime)} / {formatDuration(videoInfo.duration)}</span>
+              <input
+                className="timeline-slider"
+                type="range"
+                min="0"
+                max={Math.max(0.1, videoInfo.duration || 0.1)}
+                step="0.1"
+                value={Math.min(compareTime, videoInfo.duration || 0)}
+                onChange={(event) => seekComparison(event.target.value)}
+                aria-label="Seek comparison video"
+              />
+            </div>
+            <div className="compare-range">
+              <div><strong>Original</strong><span>Source file</span></div>
+              <input
+                type="range"
+                min="10"
+                max="90"
+                value={comparePosition}
+                onChange={(event) => setComparePosition(Number(event.target.value))}
+                aria-label="Adjust comparison split"
+              />
+              <div className="align-right"><strong>Enhanced</strong><span>Exported MP4</span></div>
+            </div>
+            <p className="compare-hint">Geser pembatas di video atau slider untuk membandingkan detail kedua versi. Tekan Play untuk memutar keduanya secara bersamaan.</p>
+          </div>
+        ) : (
+          <div className="compare-empty">
+            <span className="compare-empty-icon"><Layers3 size={22} /></span>
+            <div><strong>See the difference, frame by frame.</strong><p>Upload video dan jalankan transcoding terlebih dahulu. Double Vision akan membandingkan source dengan hasil export secara berdampingan dalam satu preview.</p></div>
+            <span className="locked-tag">UNLOCK AFTER EXPORT</span>
+          </div>
+        )}
       </section>
 
       <section className="workflow-strip" id="workflow">
